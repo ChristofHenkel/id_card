@@ -3,7 +3,7 @@ from keras.preprocessing.image import ImageDataGenerator
 from keras.layers import Dense, GlobalAveragePooling2D
 from keras.models import Model
 from keras.optimizers import Adam
-from keras.callbacks import ModelCheckpoint
+from keras.callbacks import ModelCheckpoint, EarlyStopping, ReduceLROnPlateau
 BATCH_SIZE = 16
 
 train_data_gen = ImageDataGenerator(rescale=1./255,
@@ -21,33 +21,35 @@ train_generator = train_data_gen.flow_from_directory(directory='assets/data/',
                             batch_size=BATCH_SIZE,
                              class_mode='categorical')
 
-#valid_data_gen = ImageDataGenerator(rescale=1./255)
-#valid_generator = valid_data_gen.flow_from_directory(directory='assets/valid/',
-#                             target_size=(224,224),
-#                            batch_size=BATCH_SIZE,
-#                             class_mode='categorical')#
+valid_data_gen = ImageDataGenerator(rescale=1./255)
+valid_generator = valid_data_gen.flow_from_directory(directory='assets/valid/',
+                             target_size=(224,224),
+                            batch_size=BATCH_SIZE,
+                             class_mode='categorical')
 
-base_model = VGG16(weights='imagenet', include_top=False,input_shape=(224,224,3))
-main = GlobalAveragePooling2D()(base_model.output)
-out = Dense(2, activation='softmax')(main)
+def set_model(lr, print_architecture= False):
+    base_model = VGG16(weights='imagenet', include_top=False,input_shape=(224,224,3))
+    main = GlobalAveragePooling2D()(base_model.output)
+    out = Dense(2, activation='softmax')(main)
+
+    model = Model(inputs=base_model.input, outputs = out)
+    model.compile(optimizer=Adam(lr = lr), loss='categorical_crossentropy')
+    if print_architecture:
+        model.summary()
+    return model
 
 
 
-
-
-
-
-model = Model(inputs=base_model.input, outputs = out)
-model.compile(optimizer=Adam(lr = 0.0001), loss='categorical_crossentropy')
-model.summary()
-
+model = set_model(lr=0.0001)
 
 check_point = ModelCheckpoint('model.hdf5', monitor="val_loss", mode="min", save_best_only=True, verbose=1)
-#early_stop = EarlyStopping(patience=3)
+early_stop = EarlyStopping(patience=4)
+rop = ReduceLROnPlateau(patience=2,factor=0.1, min_lr=0)
+
 history = model.fit_generator(train_generator,
 steps_per_epoch=train_generator.classes.size//BATCH_SIZE,
                               epochs=30,
-                    #validation_data = data_gen_valid(),
-                    callbacks=[check_point],
-                    #validation_steps= 540,
+                    validation_data = valid_generator,
+                    callbacks=[check_point,early_stop,rop],
+                    validation_steps= valid_generator.classes.size//BATCH_SIZE,
                     )
