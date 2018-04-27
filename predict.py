@@ -4,7 +4,7 @@ import pandas as pd
 
 BATCH_SIZE = 16
 
-model = load_model('model.hdf5')
+model = load_model('rgb_model.hdf5')
 
 test_data_gen = ImageDataGenerator(rescale=1. / 255)
 test_generator = test_data_gen.flow_from_directory(directory='assets/',
